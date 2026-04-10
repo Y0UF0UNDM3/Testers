@@ -1,3 +1,4 @@
+# main.py
 import asyncio
 import pygame
 import random
@@ -13,69 +14,47 @@ async def main():
     pygame.display.set_caption("GitHub Explorer")
     clock = pygame.time.Clock()
 
-    # --- FIELDS (PLAYER STATS) ---
+    # --- FIELDS ---
     player_rect = pygame.Rect(100, GROUND_Y - 50, 40, 50)
-    vel_y = 0
-    speed = 5
-    jump_power = -13
+    vel_y, speed, jump_power = 0, 5, -13
     is_grounded = False
-    
-    # Scenery
-    trees = [(random.randint(200, 1500), GROUND_Y) for _ in range(12)]
+    trees = [(random.randint(100, 2000), GROUND_Y) for _ in range(15)]
 
-    # --- MUSIC SETUP ---
-    # Put your "exploration_theme.ogg" in the same folder on GitHub!
+    # --- MUSIC ---
     try:
         pygame.mixer.init()
-        pygame.mixer.music.load("exploration_theme.ogg")
+        # MUST MATCH YOUR UPLOADED FILE NAME EXACTLY
+        pygame.mixer.music.load("melodigne-symphony-of-legends-192455.ogg") 
         pygame.mixer.music.play(-1)
     except:
-        print("Note: exploration_theme.ogg not found. Playing without music.")
+        print("Music file not found in repo.")
 
-    running = True
-    while running:
-        # 1. INPUT
+    while True:
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+            if event.type == pygame.QUIT: return
         
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]: player_rect.x -= speed
         if keys[pygame.K_RIGHT]: player_rect.x += speed
-        if keys[pygame.K_SPACE] and is_grounded:
-            vel_y = jump_power
+        if keys[pygame.K_SPACE] and is_grounded: vel_y = jump_power
 
-        # 2. PHYSICS (GRAVITY)
         vel_y += GRAVITY
         player_rect.y += vel_y
 
         if player_rect.bottom >= GROUND_Y:
-            player_rect.bottom = GROUND_Y
-            vel_y = 0
-            is_grounded = True
+            player_rect.bottom, vel_y, is_grounded = GROUND_Y, 0, True
         else:
             is_grounded = False
 
-        # 3. DRAWING
-        screen.fill((135, 206, 235)) # Sky
-        
-        # Draw Grass & Soil
-        pygame.draw.rect(screen, (34, 139, 34), (0, GROUND_Y, WIDTH, 20)) # Grass
-        pygame.draw.rect(screen, (100, 65, 23), (0, GROUND_Y + 20, WIDTH, 60)) # Soil
-        
-        # Draw Trees
+        screen.fill((135, 206, 235))
+        pygame.draw.rect(screen, (34, 139, 34), (0, GROUND_Y, WIDTH, 80))
         for tx, ty in trees:
-            pygame.draw.rect(screen, (80, 50, 20), (tx, ty - 40, 15, 40)) # Trunk
-            pygame.draw.circle(screen, (20, 80, 20), (tx + 7, ty - 50), 30) # Leaves
-
-        # Draw Player
+            pygame.draw.rect(screen, (80, 50, 20), (tx, ty - 40, 15, 40))
+            pygame.draw.circle(screen, (20, 80, 20), (tx + 7, ty - 50), 30)
         pygame.draw.rect(screen, (200, 30, 30), player_rect) 
 
         pygame.display.flip()
-        
-        # --- WEB REQUIREMENT ---
-        # This prevents the browser tab from crashing
-        await asyncio.sleep(0) 
+        await asyncio.sleep(0) # Critical for web
         clock.tick(60)
 
 asyncio.run(main())

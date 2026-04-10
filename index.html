@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub Explorer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; }
+        canvas { display: block; background: #87CEEB; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // --- FIELDS ---
+        const gravity = 0.6;
+        const groundY = canvas.height - 100;
+        
+        const player = {
+            x: 100, y: groundY - 50,
+            width: 40, height: 50,
+            velY: 0, speed: 5,
+            jumpPower: -15, grounded: false
+        };
+
+        const trees = [];
+        for(let i=0; i<15; i++) {
+            trees.push({ x: Math.random() * 3000, y: groundY });
+        }
+
+        // --- AUDIO ---
+        const music = new Audio('melodigne-symphony-of-legends-192455.mp3');
+        music.loop = true;
+
+        // Start music on first click (browsers block auto-play)
+        window.addEventListener('click', () => {
+            music.play();
+        }, { once: true });
+
+        // --- CONTROLS ---
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function update() {
+            // Movement
+            if (keys['ArrowLeft']) player.x -= player.speed;
+            if (keys['ArrowRight']) player.x += player.speed;
+            if (keys['Space'] && player.grounded) {
+                player.velY = player.jumpPower;
+                player.grounded = false;
+            }
+
+            // Gravity
+            player.velY += gravity;
+            player.y += player.velY;
+
+            if (player.y + player.height > groundY) {
+                player.y = groundY - player.height;
+                player.velY = 0;
+                player.grounded = true;
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Camera follow
+            ctx.save();
+            ctx.translate(-player.x + 100, 0);
+
+            // Grass & Soil
+            ctx.fillStyle = "#228B22";
+            ctx.fillRect(0, groundY, 5000, 20); // Grass
+            ctx.fillStyle = "#644117";
+            ctx.fillRect(0, groundY + 20, 5000, 500); // Soil
+
+            // Trees
+            trees.forEach(t => {
+                ctx.fillStyle = "#503214";
+                ctx.fillRect(t.x, t.y - 40, 15, 40); // Trunk
+                ctx.fillStyle = "#145014";
+                ctx.beginPath();
+                ctx.arc(t.x + 7, t.y - 50, 30, 0, Math.PI * 2); // Leaves
+                ctx.fill();
+            });
+
+            // Player
+            ctx.fillStyle = "#C81E1E";
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            ctx.restore();
+        }
+
+        update();
+    </script>
+</body>
+</html>

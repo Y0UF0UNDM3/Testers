@@ -1,106 +1,159 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>GitHub Explorer</title>
+    <meta charset="UTF-8">
+    <title>3D GitHub Explorer</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; }
-        canvas { display: block; background: #87CEEB; }
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        #instructions {
+            position: absolute; top: 10px; left: 10px; color: white;
+            font-family: sans-serif; background: rgba(0,0,0,0.5); padding: 10px;
+        }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
+    <div id="instructions">
+        <b>3D GitHub Explorer</b><br>
+        WASD to Move | SPACE to Jump | Click to Start Music
+    </div>
+    
+    <!-- Load Three.js from a CDN (Standard for GitHub Games) -->
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com" } }
+    </script>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+    <script type="module">
+        import * as THREE from 'three';
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        // --- 1. CORE SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky Blue
+        scene.fog = new THREE.Fog(0x87CEEB, 1, 100);
 
-        // --- FIELDS ---
-        const gravity = 0.6;
-        const groundY = canvas.height - 100;
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 2. LIGHTING (For Realism) ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+        sunLight.position.set(10, 20, 10);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
+
+        // --- 3. THE WORLD (Grassy Field & Trees) ---
+        // Ground
+        const groundGeo = new THREE.PlaneGeometry(200, 200);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Trees Function
+        function createTree(x, z) {
+            const group = new THREE.Group();
+            // Trunk
+            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.5);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5D4037 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 0.75;
+            trunk.castShadow = true;
+            group.add(trunk);
+            // Leaves
+            const leafGeo = new THREE.ConeGeometry(1, 2, 8);
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x1B5E20 });
+            const leaves = new THREE.Mesh(leafGeo, leafMat);
+            leaves.position.y = 2.25;
+            leaves.castShadow = true;
+            group.add(leaves);
+            
+            group.position.set(x, 0, z);
+            scene.add(group);
+        }
+
+        for(let i=0; i<40; i++) {
+            createTree(Math.random()*100 - 50, Math.random()*100 - 50);
+        }
+
+        // --- 4. PLAYER & PHYSICS FIELDS ---
+        const playerGeo = new THREE.CapsuleGeometry(0.4, 1, 4, 8);
+        const playerMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const player = new THREE.Mesh(playerGeo, playerMat);
+        player.position.y = 2;
+        player.castShadow = true;
+        scene.add(player);
+
+        let velocityY = 0;
+        const gravity = -0.015;
+        const jumpStrength = 0.3;
+        let isGrounded = false;
+
+        // --- 5. AUDIO SETUP ---
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+        const sound = new THREE.Audio(listener);
+        const audioLoader = new THREE.AudioLoader();
         
-        const player = {
-            x: 100, y: groundY - 50,
-            width: 40, height: 50,
-            velY: 0, speed: 5,
-            jumpPower: -15, grounded: false
-        };
+        // Match your exact filename
+        audioLoader.load('melodigne-symphony-of-legends-192455.mp3', (buffer) => {
+            sound.setBuffer(buffer);
+            sound.setLoop(true);
+            sound.setVolume(0.5);
+        });
 
-        const trees = [];
-        for(let i=0; i<15; i++) {
-            trees.push({ x: Math.random() * 3000, y: groundY });
-        }
+        window.addEventListener('click', () => { if(!sound.isPlaying) sound.play(); });
 
-        // --- AUDIO ---
-        const music = new Audio('melodigne-symphony-of-legends-192455.mp3');
-        music.loop = true;
-
-        // Start music on first click (browsers block auto-play)
-        window.addEventListener('click', () => {
-            music.play();
-        }, { once: true });
-
-        // --- CONTROLS ---
+        // --- 6. CONTROLS ---
         const keys = {};
-        window.addEventListener('keydown', e => keys[e.code] = true);
-        window.addEventListener('keyup', e => keys[e.code] = false);
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        function update() {
+        // --- 7. GAME LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
             // Movement
-            if (keys['ArrowLeft']) player.x -= player.speed;
-            if (keys['ArrowRight']) player.x += player.speed;
-            if (keys['Space'] && player.grounded) {
-                player.velY = player.jumpPower;
-                player.grounded = false;
+            const moveSpeed = 0.1;
+            if(keys['KeyW']) player.position.z -= moveSpeed;
+            if(keys['KeyS']) player.position.z += moveSpeed;
+            if(keys['KeyA']) player.position.x -= moveSpeed;
+            if(keys['KeyD']) player.position.x += moveSpeed;
+
+            // Gravity System
+            velocityY += gravity;
+            player.position.y += velocityY;
+
+            if(player.position.y <= 0.9) { // Ground detection
+                player.position.y = 0.9;
+                velocityY = 0;
+                isGrounded = true;
+            } else {
+                isGrounded = false;
             }
 
-            // Gravity
-            player.velY += gravity;
-            player.y += player.velY;
-
-            if (player.y + player.height > groundY) {
-                player.y = groundY - player.height;
-                player.velY = 0;
-                player.grounded = true;
+            if(keys['Space'] && isGrounded) {
+                velocityY = jumpStrength;
             }
-
-            draw();
-            requestAnimationFrame(update);
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // Camera follow
-            ctx.save();
-            ctx.translate(-player.x + 100, 0);
+            camera.position.set(player.position.x, player.position.y + 2, player.position.z + 5);
+            camera.lookAt(player.position);
 
-            // Grass & Soil
-            ctx.fillStyle = "#228B22";
-            ctx.fillRect(0, groundY, 5000, 20); // Grass
-            ctx.fillStyle = "#644117";
-            ctx.fillRect(0, groundY + 20, 5000, 500); // Soil
-
-            // Trees
-            trees.forEach(t => {
-                ctx.fillStyle = "#503214";
-                ctx.fillRect(t.x, t.y - 40, 15, 40); // Trunk
-                ctx.fillStyle = "#145014";
-                ctx.beginPath();
-                ctx.arc(t.x + 7, t.y - 50, 30, 0, Math.PI * 2); // Leaves
-                ctx.fill();
-            });
-
-            // Player
-            ctx.fillStyle = "#C81E1E";
-            ctx.fillRect(player.x, player.y, player.width, player.height);
-
-            ctx.restore();
+            renderer.render(scene, camera);
         }
+        animate();
 
-        update();
+        // Handle Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>
